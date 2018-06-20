@@ -6,10 +6,10 @@ import { default as Web3} from 'web3';
 import { default as contract } from 'truffle-contract'
 
 // Import our contract artifacts and turn them into usable abstractions.
-import metacoin_artifacts from '../../build/contracts/MetaCoin.json'
+import voting_artifacts from '../../build/contracts/Voting.json'
 
-// MetaCoin is our usable abstraction, which we'll use through the code below.
-var MetaCoin = contract(metacoin_artifacts);
+// Voting is our usable abstraction, which we'll use through the code below.
+var Voting = contract(voting_artifacts);
 
 // The following code is simple to show off interacting with your contracts.
 // As your needs grow you will likely need to change its form and structure.
@@ -17,12 +17,14 @@ var MetaCoin = contract(metacoin_artifacts);
 var accounts;
 var account;
 
+var candidates = {"Rama": "candidate-1", "Nick": "candidate-2", "Jose": "candidate-3"};
+
 window.App = {
   start: function() {
     var self = this;
 
     // Bootstrap the MetaCoin abstraction for Use.
-    MetaCoin.setProvider(web3.currentProvider);
+    Voting.setProvider(web3.currentProvider);
 
     // Get the initial account balance so it can be displayed.
     web3.eth.getAccounts(function(err, accs) {
@@ -39,51 +41,37 @@ window.App = {
       accounts = accs;
       account = accounts[0];
 
-      self.refreshBalance();
     });
+
+    // Load all candidates and their Votes
+    self.loadCandidatesAndVotes();
+
   },
 
-  setStatus: function(message) {
-    var status = document.getElementById("status");
-    status.innerHTML = message;
+  loadCandidatesAndVotes: function() {
+    var candidateNames = Object.keys(candidates);
+
+    for (var i = 0; i < candidateNames.length; i++) {
+      let name = candidateNames[i];
+      Voting.deployed().then(function(f) {
+        f.totalVotesFor.call(name).then(function(f) {
+          $("#" + candidates[name]).html(f.toNumber());
+        })
+      })
+    }
   },
 
-  refreshBalance: function() {
-    var self = this;
-
-    var meta;
-    MetaCoin.deployed().then(function(instance) {
-      meta = instance;
-      return meta.getBalance.call(account, {from: account});
-    }).then(function(value) {
-      var balance_element = document.getElementById("balance");
-      balance_element.innerHTML = value.valueOf();
-    }).catch(function(e) {
-      console.log(e);
-      self.setStatus("Error getting balance; see log.");
-    });
-  },
-
-  sendCoin: function() {
-    var self = this;
-
-    var amount = parseInt(document.getElementById("amount").value);
-    var receiver = document.getElementById("receiver").value;
-
-    this.setStatus("Initiating transaction... (please wait)");
-
-    var meta;
-    MetaCoin.deployed().then(function(instance) {
-      meta = instance;
-      return meta.sendCoin(receiver, amount, {from: account});
-    }).then(function() {
-      self.setStatus("Transaction complete!");
-      self.refreshBalance();
-    }).catch(function(e) {
-      console.log(e);
-      self.setStatus("Error sending coin; see log.");
-    });
+  voteForCandidate: function() {
+    var candidateName = $("#candidate").val();
+    Voting.deployed().then(function(i) {
+      i.voteForCandidate(candidateName, {from: web3.eth.accounts[0]}).then(function(f) {
+        i.totalVotesFor.call(candidateName).then(function(f) {
+          $("#" + candidates[candidateName]).html(f.toNumber());
+        })
+      })
+    })
   }
+
 };
 
 window.addEventListener('load', function() {
@@ -93,9 +81,9 @@ window.addEventListener('load', function() {
     // Use Mist/MetaMask's provider
     window.web3 = new Web3(web3.currentProvider);
   } else {
-    console.warn("No web3 detected. Falling back to http://127.0.0.1:9545. You should remove this fallback when you deploy live, as it's inherently insecure. Consider switching to Metamask for development. More info here: http://truffleframework.com/tutorials/truffle-and-metamask");
+    console.warn("No web3 detected. Falling back to http://127.0.0.1:8545. You should remove this fallback when you deploy live, as it's inherently insecure. Consider switching to Metamask for development. More info here: http://truffleframework.com/tutorials/truffle-and-metamask");
     // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
-    window.web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:9545"));
+    window.web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
   }
 
   App.start();
